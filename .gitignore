@@ -1,0 +1,27 @@
+*.py[co]
+.DS_Store
+
+# Twisted
+dropin.cache
+_trial_temp
+
+# Sphinx
+docs/_build
+
+# tox
+.tox
+
+# coverage
+.coverage
+htmlcov
+
+# Packages
+*.egg
+*.egg-info
+dist
+build
+eggs
+parts
+bin
+develop-eggs
+.installed.cfg
