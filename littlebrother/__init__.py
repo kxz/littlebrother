@@ -147,12 +147,18 @@ class TitleFetcher(object):
         self.max_soft_redirects = 2
 
     @inlineCallbacks
-    def fetch_title(self, uri):
+    def fetch_title(self, uri, with_response=False):
         """Fetch the document at *uri* and return a `Deferred` yielding
-        the document title or summary as a Unicode string."""
+        the document title or summary as a Unicode string.
+
+        If *with_response* is true, yield a ``(response, title)`` tuple
+        instead, where *response* is a Twisted Web `Response` object."""
         title = None
+        response = None
         for _ in xrange(self.max_soft_redirects):
+            last_response = response
             response = yield self.agent.request('GET', uri)
+            response.setPreviousResponse(last_response)
             content_type, params = cgi.parse_header(
                 response.headers.getRawHeaders('Content-Type', [''])[0])
             if content_type in self.extractors:
@@ -172,6 +178,8 @@ class TitleFetcher(object):
             title = u'{} document'.format(content_type or u'Unknown')
             if response.length is not UNKNOWN_LENGTH:
                 title += u' ({})'.format(filesize(response.length))
+        if with_response:
+            returnValue((response, title))
         returnValue(title)
 
 
@@ -188,7 +196,6 @@ def get_fetcher():
     return fetcher
 
 
-def fetch_title(uri):
-    """Fetch the document at *uri* and return a `Deferred` yielding the
-    document title or summary as a Unicode string."""
-    return get_fetcher().fetch_title(uri)
+def fetch_title(*args, **kwargs):
+    return get_fetcher().fetch_title(*args, **kwargs)
+fetch_title.__doc__ = TitleFetcher.fetch_title.__doc__
