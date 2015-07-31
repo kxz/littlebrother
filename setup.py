@@ -20,7 +20,7 @@ class Tox(test):
 setup(
     name='littlebrother',
     description='An HTTP document title extractor for Twisted Web',
-    version='0.1-dev',
+    version='0.1',
     author='Kevin Xiwei Zheng',
     author_email='blankplacement+littlebrother@gmail.com',
     url='https://github.com/kxz/littlebrother',
