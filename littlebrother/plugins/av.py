@@ -2,6 +2,7 @@
 
 
 from __future__ import absolute_import, division
+import os
 import tempfile
 
 import av
@@ -20,7 +21,7 @@ class AVTitleExtractor(object):
 
     def __init__(self):
         #: The maximum number of bytes this extractor will download.
-        self.max_download_bytes = 1048576
+        self.max_download_bytes = 4194304
 
     @inlineCallbacks
     def extract(self, response):
@@ -28,6 +29,8 @@ class AVTitleExtractor(object):
             content = yield read_body(response,
                                       max_bytes=self.max_download_bytes)
             f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
             try:
                 container = av.open(f.name)
             except av.AVError:
