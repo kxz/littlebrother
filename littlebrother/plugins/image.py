@@ -33,9 +33,8 @@ class ImageTitleExtractor(object):
             # truncating the image too early.  Who knows?
             returnValue(None)
         width, height = pbuffer.size
-        format = pbuffer.format
         returnValue(u'{} image ({:n} \u00d7 {:n} pixels{})'.format(
-            format, width, height,
+            pbuffer.format, width, height,
             (u'' if response.length is UNKNOWN_LENGTH
                  else u', ' + filesize(response.length))))
 

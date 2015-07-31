@@ -7,8 +7,9 @@ import sys
 from urlparse import urljoin, urlparse
 
 import ipaddress
-from twisted.internet import reactor, protocol
+from twisted.internet import reactor
 from twisted.internet.defer import Deferred, inlineCallbacks, returnValue
+from twisted.internet.protocol import Protocol, connectionDone
 from twisted.plugin import IPlugin, getPlugins
 from twisted.python.failure import Failure
 from twisted.web.client import (IAgent, Agent, ContentDecoderAgent,
@@ -25,7 +26,7 @@ from .humanize import filesize
 # HTTP response body truncation
 #
 
-class TruncatingReadBodyProtocol(protocol.Protocol):
+class TruncatingReadBodyProtocol(Protocol):
     """A protocol that collects data sent to it up to a maximum of
     *max_bytes*, then discards the rest."""
 
@@ -44,7 +45,7 @@ class TruncatingReadBodyProtocol(protocol.Protocol):
         if self.remaining <= 0:
             self.transport.loseConnection()
 
-    def connectionLost(self, reason):
+    def connectionLost(self, reason=connectionDone):
         if not self.finished.called:
             self.finished.callback(''.join(self.data_buffer))
 
