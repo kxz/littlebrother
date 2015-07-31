@@ -37,8 +37,5 @@ setup(
         'av': ['av'],
         'html': ['beautifulsoup4'],
         'image': ['Pillow']},
-    tests_require=[
-        'tox'],
-    cmdclass={
-        'test': Tox},
-    zip_safe=False)
+    tests_require=['tox'],
+    cmdclass={'test': Tox})
