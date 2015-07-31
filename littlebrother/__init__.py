@@ -159,8 +159,8 @@ class TitleFetcher(object):
             last_response = response
             response = yield self.agent.request('GET', uri)
             response.setPreviousResponse(last_response)
-            content_type, params = cgi.parse_header(
-                response.headers.getRawHeaders('Content-Type', [''])[0])
+            content_type = cgi.parse_header(
+                response.headers.getRawHeaders('Content-Type', [''])[0])[0]
             if content_type in self.extractors:
                 extractor = self.extractors[content_type]
                 extracted = yield extractor.extract(response)
@@ -173,7 +173,7 @@ class TitleFetcher(object):
             break
         else:
             raise ResponseFailed([Failure(InfiniteRedirection(
-                599, 'Too many soft redirects', location=url))])
+                599, 'Too many soft redirects', location=uri))])
         if title is None:
             title = u'{} document'.format(content_type or u'Unknown')
             if response.length is not UNKNOWN_LENGTH:
