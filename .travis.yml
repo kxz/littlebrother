@@ -4,11 +4,39 @@ addons:
     packages:
       - pkg-config
       - python-dev
-      # Pillow dependencies
-      - libtiff4-dev
-      - libjpeg8-dev
-      - zlib1g-dev
+      # PyAV FFmpeg build dependencies
+      # Replace this with the actual FFmpeg dev packages for 14.04.
+      - debhelper
+      - libasound2-dev
+      - libbz2-dev
+      - libdc1394-22-dev
       - libfreetype6-dev
+      - libgsm1-dev
+      - libimlib2-dev
+      - libjack-dev
+      - libraw1394-dev
+      - libschroedinger-dev
+      - libsdl1.2-dev
+      - libspeex-dev
+      - libtheora-dev
+      - libtiff4-dev
+      - libva-dev
+      - libvdpau-dev
+      - libvorbis-dev
+      - libvpx-dev
+      - libx11-dev
+      - libxext-dev
+      - libxfixes-dev
+      - libxvmc-dev
+      - texi2html
+      - yasm
+      - zlib1g-dev
+      # Pillow dependencies
+      # Those commented out are already specified above.
+      #- libtiff4-dev
+      - libjpeg8-dev
+      #- zlib1g-dev
+      #- libfreetype6-dev
       - liblcms2-dev
 before_install:
   # PyAV dependencies
