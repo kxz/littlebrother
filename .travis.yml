@@ -4,19 +4,15 @@ addons:
     packages:
       - pkg-config
       - python-dev
-      # PyAV depdendencies
-      - libavformat-dev
-      - libavcodec-dev
-      - libavdevice-dev
-      - libavutil-dev
-      - libswscale-dev
-      - libavresample-dev
       # Pillow dependencies
       - libtiff4-dev
       - libjpeg8-dev
       - zlib1g-dev
       - libfreetype6-dev
       - liblcms2-dev
+before_install:
+  # PyAV dependencies
+  - scripts/build-ffmpeg.sh
 install:
   - pip install tox python-coveralls
 script:
