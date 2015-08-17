@@ -3,22 +3,33 @@
 
 import os.path
 
-from twisted.python.failure import Failure
-from twisted.test.proto_helpers import StringTransport
-from twisted.web.client import ResponseDone
-from twisted.web._newclient import HTTPClientParser, Request
-from twisted.web.http_headers import Headers
+from stenographer import CassetteAgent
+from twisted.web.client import (ContentDecoderAgent, RedirectAgent,
+                                Agent, GzipDecoder)
+from twisted.web.test.test_agent import (FakeReactorAndConnectMixin)
 
 
-def saved_response(filename):
-    """Parse the HTTP response serialized to *filename* and return a
-    `Deferred` yielding a Twisted Web `Response` object."""
-    request = Request('GET', '/', Headers(), None)
-    parser = HTTPClientParser(request, lambda _: None)
-    parser.makeConnection(StringTransport())
-    finished = parser._responseDeferred
-    response_path = os.path.join(os.path.dirname(__file__), 'data', filename)
-    with open(response_path) as f:
-        parser.dataReceived(f.read())
-    parser.connectionLost(Failure(ResponseDone()))
-    return finished
+def cassette_path(name):
+    """Return the full path of a cassette file in our fixtures."""
+    return os.path.join(os.path.dirname(__file__),
+                        'fixtures', 'cassettes', name + '.json')
+
+
+class CassetteTestMixin(FakeReactorAndConnectMixin):
+    extractor = None
+
+    def setUp(self):
+        self.reactor = self.Reactor()
+        self.agent = self.buildAgentForWrapperTest(self.reactor)
+        self.connect(None)
+
+    def assert_title(self, cassette_name, expected):
+        agent = ContentDecoderAgent(
+            RedirectAgent(CassetteAgent(self.agent,
+                                        cassette_path(cassette_name))),
+            [('gzip', GzipDecoder)])
+        finished = agent.request(
+            'GET', 'http://127.0.0.1:5000/{}'.format(cassette_name))
+        finished.addCallback(self.extractor.extract)
+        finished.addCallback(self.assertEqual, expected)
+        return finished
