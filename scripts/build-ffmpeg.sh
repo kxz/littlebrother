@@ -2,6 +2,7 @@
 
 pkg-config --exists libavformat
 if [ $? != 0 ]; then
+    sudo apt-get update
     sudo apt-get build-dep -qq --fix-missing ffmpeg
     FFMPEG_SRC=$(mktemp -d)
     cd $FFMPEG_SRC
