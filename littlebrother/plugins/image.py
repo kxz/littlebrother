@@ -1,10 +1,8 @@
 """Title extractor for image files using Pillow."""
 
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
+from __future__ import division
+from io import BytesIO
 
 from PIL import Image
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -12,7 +10,7 @@ from twisted.web.iweb import UNKNOWN_LENGTH
 from zope.interface import implements
 
 from .. import ITitleExtractor, read_body
-from ..humanize import filesize
+from ..humanize import duration, filesize
 
 
 class ImageTitleExtractor(object):
@@ -25,16 +23,28 @@ class ImageTitleExtractor(object):
 
     @inlineCallbacks
     def extract(self, response):
+        truncated = (response.length is UNKNOWN_LENGTH or
+                     response.length > self.max_download_bytes)
         content = yield read_body(response, max_bytes=self.max_download_bytes)
         try:
-            pbuffer = Image.open(StringIO(content))
+            image = Image.open(BytesIO(content))
         except IOError:
             # The image content is invalid.  It might be our fault for
             # truncating the image too early.  Who knows?
             returnValue(None)
-        width, height = pbuffer.size
-        returnValue(u'{} image ({:n} \u00d7 {:n} pixels{})'.format(
-            pbuffer.format, width, height,
+        image_type = 'image'
+        image_duration = u''
+        if getattr(image, 'is_animated', False):
+            image_type = 'animation'
+            if not truncated:
+                # Assume a GIF animation.
+                frame_duration = image.info.get('duration') / 1000
+                if frame_duration is not None:
+                    image_duration = u', {}'.format(
+                        duration(image.n_frames * frame_duration))
+        returnValue(u'{} {} ({:n} \u00d7 {:n} pixels{}{})'.format(
+            image.format, image_type,
+            image.width, image.height, image_duration,
             (u'' if response.length is UNKNOWN_LENGTH
                  else u', ' + filesize(response.length))))
 

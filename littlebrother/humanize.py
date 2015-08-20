@@ -4,6 +4,8 @@
 def duration(seconds):
     """Return a string of the form "1 hr 2 min 3 sec" representing the
     given number of seconds."""
+    if seconds < 1:
+        return 'less than 1 sec'
     seconds = int(round(seconds))
     components = []
     for magnitude, label in ((3600, 'hr'), (60, 'min'), (1, 'sec')):

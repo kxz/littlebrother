@@ -7,6 +7,10 @@ from ..humanize import duration, filesize
 
 
 class DurationTestCase(TestCase):
+    def test_instant(self):
+        self.assertEqual(duration(0), 'less than 1 sec')
+        self.assertEqual(duration(0.5), 'less than 1 sec')
+
     def test_seconds(self):
         self.assertEqual(duration(1), '1 sec')
         self.assertEqual(duration(59), '59 sec')

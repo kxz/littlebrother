@@ -4,9 +4,9 @@
 import os.path
 
 from stenographer import CassetteAgent
+from twisted.internet import reactor
 from twisted.web.client import (ContentDecoderAgent, RedirectAgent,
                                 Agent, GzipDecoder)
-from twisted.web.test.test_agent import (FakeReactorAndConnectMixin)
 
 
 def cassette_path(name):
@@ -15,21 +15,17 @@ def cassette_path(name):
                         'fixtures', 'cassettes', name + '.json')
 
 
-class CassetteTestMixin(FakeReactorAndConnectMixin):
+class CassetteTestMixin(object):
     extractor = None
 
-    def setUp(self):
-        self.reactor = self.Reactor()
-        self.agent = self.buildAgentForWrapperTest(self.reactor)
-        self.connect(None)
-
     def assert_title(self, cassette_name, expected):
-        agent = ContentDecoderAgent(
-            RedirectAgent(CassetteAgent(self.agent,
-                                        cassette_path(cassette_name))),
-            [('gzip', GzipDecoder)])
+        cassette_agent = CassetteAgent(Agent(reactor),
+                                       cassette_path(cassette_name))
+        agent = ContentDecoderAgent(RedirectAgent(cassette_agent),
+                                    [('gzip', GzipDecoder)])
         finished = agent.request(
             'GET', 'http://127.0.0.1:5000/{}'.format(cassette_name))
         finished.addCallback(self.extractor.extract)
         finished.addCallback(self.assertEqual, expected)
+        finished.addBoth(cassette_agent.save)
         return finished
