@@ -5,8 +5,8 @@ import argparse
 from itertools import imap
 import sys
 
-from twisted.internet import reactor
 from twisted.internet.defer import DeferredList
+from twisted.internet.task import react
 
 from . import fetch_title
 
@@ -18,10 +18,9 @@ def print_and_exit(results):
             print value.encode('utf-8')
         else:
             value.printTraceback()
-    reactor.stop()
 
 
-def main():
+def main(reactor):
     """Main command line entry point."""
     parser = argparse.ArgumentParser(
         description='Fetch a URI or series of URIs and print a title '
@@ -30,12 +29,17 @@ def main():
                'read from standard input, one per line.')
     parser.add_argument(
         'uris', metavar='URI', nargs='*', help='URI to fetch')
+    parser.add_argument(
+        '-H', '--hostname-tag', action='store_true',
+        help='prefix titles with a hostname tag')
     args = parser.parse_args()
     uris = args.uris or imap(lambda x: x.strip(), sys.stdin)
-    finished = DeferredList([fetch_title(uri) for uri in uris])
+    finished = DeferredList([
+        fetch_title(uri, hostname_tag=args.hostname_tag)
+        for uri in uris])
     finished.addCallback(print_and_exit)
-    reactor.run()
+    return finished
 
 
 if __name__ == '__main__':
-    main()
+    react(main)

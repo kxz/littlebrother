@@ -12,7 +12,7 @@ from twisted.internet.defer import Deferred, inlineCallbacks, returnValue
 from twisted.internet.protocol import Protocol, connectionDone
 from twisted.plugin import IPlugin, getPlugins
 from twisted.python.failure import Failure
-from twisted.web.client import (IAgent, Agent, ContentDecoderAgent,
+from twisted.web.client import (URI, IAgent, Agent, ContentDecoderAgent,
                                 RedirectAgent, GzipDecoder, ResponseFailed)
 from twisted.web.error import InfiniteRedirection
 from twisted.web.iweb import UNKNOWN_LENGTH
@@ -148,12 +148,13 @@ class TitleFetcher(object):
         self.max_soft_redirects = 2
 
     @inlineCallbacks
-    def fetch_title(self, uri, with_response=False):
+    def fetch_title(self, uri, hostname_tag=False):
         """Fetch the document at *uri* and return a `Deferred` yielding
         the document title or summary as a Unicode string.
 
-        If *with_response* is true, yield a ``(response, title)`` tuple
-        instead, where *response* is a Twisted Web `Response` object."""
+        If *hostname_tag* is true, prefix the extracted title with the
+        hostname of the initially requested URI, as well as the hostname
+        of the final URI if it differs due to redirects."""
         title = None
         response = None
         for _ in xrange(self.max_soft_redirects):
@@ -179,8 +180,14 @@ class TitleFetcher(object):
             title = u'{} document'.format(content_type or u'Unknown')
             if response.length is not UNKNOWN_LENGTH:
                 title += u' ({})'.format(filesize(response.length))
-        if with_response:
-            returnValue((response, title))
+        if hostname_tag:
+            initial = URI.fromBytes(uri).host
+            final = URI.fromBytes(response.request.absoluteURI).host
+            if initial == final:
+                tag = initial
+            else:
+                tag = u'{} \u2192 {}'.format(initial, final)
+            title = u'[{}] {}'.format(tag, title)
         returnValue(title)
 
 

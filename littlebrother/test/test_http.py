@@ -2,15 +2,14 @@
 
 
 from twisted.internet.defer import Deferred, succeed
-from twisted.python.failure import Failure
-from twisted.test.proto_helpers import StringTransport
 from twisted.trial.unittest import TestCase
-from twisted.web.client import Response
+from twisted.web.client import Response, RedirectAgent
 from twisted.web.http_headers import Headers
-from twisted.web.test.test_agent import (AgentTestsMixin,
-                                         FakeReactorAndConnectMixin)
+from twisted.web.test.test_agent import (
+    AbortableStringTransport, AgentTestsMixin, FakeReactorAndConnectMixin)
 
-from .. import TruncatingReadBodyProtocol, BlacklistingAgent, BlacklistedHost
+from .. import (TruncatingReadBodyProtocol, BlacklistingAgent,
+                BlacklistedHost, TitleFetcher)
 
 
 class TruncatingReadBodyProtocolTestCase(TestCase):
@@ -18,7 +17,7 @@ class TruncatingReadBodyProtocolTestCase(TestCase):
         finished = Deferred()
         finished.addCallback(self.assertEqual, expected)
         response = Response(('HTTP', 1, 1), 200, 'OK', Headers(),
-                            StringTransport())
+                            AbortableStringTransport())
         protocol = TruncatingReadBodyProtocol(
             response.code, response.phrase, finished, max_bytes=8)
         response.deliverBody(protocol)
@@ -33,9 +32,8 @@ class TruncatingReadBodyProtocolTestCase(TestCase):
         return self.assert_delivery('#' * 16, '#' * 8)
 
 
-class BlacklistingAgentTestCase(TestCase,
-                                FakeReactorAndConnectMixin,
-                                AgentTestsMixin):
+class BlacklistingAgentTestCase(AgentTestsMixin,
+                                FakeReactorAndConnectMixin, TestCase):
     # <https://twistedmatrix.com/trac/ticket/4024>... one wishes.
     #
     # Based in part on `twisted.web.test.test_agent.RedirectAgentTests`.
@@ -72,3 +70,61 @@ class BlacklistingAgentTestCase(TestCase,
                 uri = '{}://{}/'.format(protocol, host)
                 for method in ('GET', 'POST'):
                     self.assert_blacklist(method, uri)
+
+
+class HostnameTagTestCase(AgentTestsMixin,
+                          FakeReactorAndConnectMixin, TestCase):
+    def makeAgent(self):
+        return self.buildAgentForWrapperTest(self.reactor)
+
+    def setUp(self):
+        self.reactor = self.Reactor()
+        self.agent = RedirectAgent(self.makeAgent())
+        self.fetcher = TitleFetcher()
+        self.fetcher.agent = self.agent
+        self.connect(None)
+
+    def test_no_redirect(self):
+        finished = self.fetcher.fetch_title(
+            'http://foo.test/', hostname_tag=True)
+        request, result = self.protocol.requests.pop()
+        response = Response._construct(('HTTP', 1, 1), 200, 'OK', Headers(),
+                                       AbortableStringTransport(), request)
+        result.callback(response)
+        finished.addCallback(self.assertEqual, u'[foo.test] Unknown document')
+        return finished
+
+    def test_redirect_to_different_host(self):
+        finished = self.fetcher.fetch_title(
+            'http://foo.test/', hostname_tag=True)
+        request, result = self.protocol.requests.pop()
+        redirect_headers = Headers()
+        redirect_headers.addRawHeader('Location', 'http://bar.test/')
+        response = Response._construct(
+            ('HTTP', 1, 1), 301, 'Moved Permanently', redirect_headers,
+            AbortableStringTransport(), request)
+        result.callback(response)
+        request, result = self.protocol.requests.pop()
+        response = Response._construct(('HTTP', 1, 1), 200, 'OK', Headers(),
+                                       AbortableStringTransport(), request)
+        result.callback(response)
+        finished.addCallback(self.assertEqual,
+                             u'[foo.test \u2192 bar.test] Unknown document')
+        return finished
+
+    def test_redirect_to_different_host(self):
+        finished = self.fetcher.fetch_title(
+            'http://foo.test/', hostname_tag=True)
+        request, result = self.protocol.requests.pop()
+        redirect_headers = Headers()
+        redirect_headers.addRawHeader('Location', 'http://foo.test/bar')
+        response = Response._construct(
+            ('HTTP', 1, 1), 301, 'Moved Permanently', redirect_headers,
+            AbortableStringTransport(), request)
+        result.callback(response)
+        request, result = self.protocol.requests.pop()
+        response = Response._construct(('HTTP', 1, 1), 200, 'OK', Headers(),
+                                       AbortableStringTransport(), request)
+        result.callback(response)
+        finished.addCallback(self.assertEqual, u'[foo.test] Unknown document')
+        return finished
