@@ -26,6 +26,11 @@ class ImageTestCase(CassetteTestMixin, TestCase):
             'image/gif-animated-truncated',
             u'GIF animation (640 \u00d7 480 pixels, 939 KB)')
 
+    def test_gif_animated_truncated_first_frame(self):
+        return self.assert_title(
+            'image/gif-animated-truncated-first-frame',
+            u'GIF image (1920 \u00d7 1080 pixels, 5.89 MB)')
+
     def test_png(self):
         return self.assert_title(
             'image/png',

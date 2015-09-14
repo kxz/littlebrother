@@ -34,14 +34,18 @@ class ImageTitleExtractor(object):
             returnValue(None)
         image_type = 'image'
         image_duration = u''
-        if getattr(image, 'is_animated', False):
-            image_type = 'animation'
-            if not truncated:
-                # Assume a GIF animation.
-                frame_duration = image.info.get('duration') / 1000
-                if frame_duration is not None:
-                    image_duration = u', {}'.format(
-                        duration(image.n_frames * frame_duration))
+        try:
+            if getattr(image, 'is_animated', False):
+                image_type = 'animation'
+                if not truncated:
+                    # Assume a GIF animation.
+                    frame_duration = image.info.get('duration') / 1000
+                    if frame_duration is not None:
+                        image_duration = u', {}'.format(
+                            duration(image.n_frames * frame_duration))
+        except IOError:
+            # Couldn't seek because of truncated image.
+            pass
         returnValue(u'{} {} ({:n} \u00d7 {:n} pixels{}{})'.format(
             image.format, image_type,
             image.width, image.height, image_duration,

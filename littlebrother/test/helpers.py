@@ -20,7 +20,8 @@ class CassetteTestMixin(object):
 
     def assert_title(self, cassette_name, expected):
         cassette_agent = CassetteAgent(Agent(reactor),
-                                       cassette_path(cassette_name))
+                                       cassette_path(cassette_name),
+                                       preserve_exact_body_bytes=True)
         agent = ContentDecoderAgent(RedirectAgent(cassette_agent),
                                     [('gzip', GzipDecoder)])
         finished = agent.request(
