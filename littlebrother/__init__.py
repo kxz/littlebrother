@@ -156,10 +156,11 @@ class TitleFetcher(object):
         hostname of the initially requested URI, as well as the hostname
         of the final URI if it differs due to redirects."""
         title = None
+        current = uri
         response = None
         for _ in xrange(self.max_soft_redirects):
             last_response = response
-            response = yield self.agent.request('GET', uri)
+            response = yield self.agent.request('GET', current)
             response.setPreviousResponse(last_response)
             content_type = cgi.parse_header(
                 response.headers.getRawHeaders('Content-Type', [''])[0])[0]
@@ -167,7 +168,7 @@ class TitleFetcher(object):
                 extractor = self.extractors[content_type]
                 extracted = yield extractor.extract(response)
                 if isinstance(extracted, Redirect):
-                    uri = urljoin(uri, extracted.location)
+                    current = urljoin(current, extracted.location)
                     continue
                 title = extracted
             # The only case where we'd want to loop again is when the
@@ -175,7 +176,7 @@ class TitleFetcher(object):
             break
         else:
             raise ResponseFailed([Failure(InfiniteRedirection(
-                599, 'Too many soft redirects', location=uri))])
+                599, 'Too many soft redirects', location=current))])
         if title is None:
             title = u'{} document'.format(content_type or u'Unknown')
             if response.length is not UNKNOWN_LENGTH:

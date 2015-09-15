@@ -9,7 +9,7 @@ from twisted.web.test.test_agent import (
     AbortableStringTransport, AgentTestsMixin, FakeReactorAndConnectMixin)
 
 from .. import (TruncatingReadBodyProtocol, BlacklistingAgent,
-                BlacklistedHost, TitleFetcher)
+                BlacklistedHost, TitleFetcher, Redirect)
 
 
 class TruncatingReadBodyProtocolTestCase(TestCase):
@@ -72,6 +72,11 @@ class BlacklistingAgentTestCase(AgentTestsMixin,
                     self.assert_blacklist(method, uri)
 
 
+class SoftRedirectExtractor(object):
+    def extract(self, response):
+        return succeed(Redirect('http://bar.test/'))
+
+
 class HostnameTagTestCase(AgentTestsMixin,
                           FakeReactorAndConnectMixin, TestCase):
     def makeAgent(self):
@@ -112,7 +117,7 @@ class HostnameTagTestCase(AgentTestsMixin,
                              u'[foo.test \u2192 bar.test] Unknown document')
         return finished
 
-    def test_redirect_to_different_host(self):
+    def test_redirect_to_same_host(self):
         finished = self.fetcher.fetch_title(
             'http://foo.test/', hostname_tag=True)
         request, result = self.protocol.requests.pop()
@@ -127,4 +132,23 @@ class HostnameTagTestCase(AgentTestsMixin,
                                        AbortableStringTransport(), request)
         result.callback(response)
         finished.addCallback(self.assertEqual, u'[foo.test] Unknown document')
+        return finished
+
+    def test_soft_redirect(self):
+        self.fetcher.extractors = {'text/html': SoftRedirectExtractor()}
+        finished = self.fetcher.fetch_title(
+            'http://foo.test/', hostname_tag=True)
+        request, result = self.protocol.requests.pop()
+        redirect_headers = Headers()
+        redirect_headers.addRawHeader('Content-Type', 'text/html')
+        response = Response._construct(
+            ('HTTP', 1, 1), 200, 'OK', redirect_headers,
+            AbortableStringTransport(), request)
+        result.callback(response)
+        request, result = self.protocol.requests.pop()
+        response = Response._construct(('HTTP', 1, 1), 200, 'OK', Headers(),
+                                       AbortableStringTransport(), request)
+        result.callback(response)
+        finished.addCallback(self.assertEqual,
+                             u'[foo.test \u2192 bar.test] Unknown document')
         return finished
