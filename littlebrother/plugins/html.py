@@ -29,6 +29,8 @@ class HTMLTitleExtractor(object):
         #: considered a soft redirect.  This avoids catching pages that
         #: automatically refresh themselves every minute or longer.
         self.max_refresh_delay = 15
+        #: Whether to ignore the contents of ``<noscript>`` elements.
+        self.ignore_noscript = True
 
     @inlineCallbacks
     def extract(self, response):
@@ -39,6 +41,9 @@ class HTMLTitleExtractor(object):
         content = yield read_body(response, max_bytes=self.max_download_bytes)
         soup = BeautifulSoup(content, self.parser,
                              from_encoding=params.get('charset'))
+        if self.ignore_noscript:
+            for noscript in soup('noscript'):
+                noscript.clear()
         # Handle any <meta> refreshes.
         for refresh in soup('meta', attrs=META_REFRESH_ATTRS):
             seconds, params = cgi.parse_header(refresh['content'])
