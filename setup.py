@@ -29,7 +29,7 @@ setup(
     package_data={
         'littlebrother': ['test/data/*']},
     install_requires=[
-        'Twisted>=14.0.0',
+        'Twisted>=16.0.0',
         'pyOpenSSL',
         'service_identity',
         'ipaddress'],

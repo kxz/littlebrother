@@ -1,3 +1,4 @@
+# -*- coding: utf-8
 """Tests for HTTP machinery."""
 
 
@@ -74,7 +75,7 @@ class BlacklistingAgentTestCase(AgentTestsMixin,
 
 class SoftRedirectExtractor(object):
     def extract(self, response):
-        return succeed(Redirect('http://bar.test/'))
+        return succeed(Redirect(u'http://bar.test/'))
 
 
 class HostnameTagTestCase(AgentTestsMixin,
@@ -114,7 +115,7 @@ class HostnameTagTestCase(AgentTestsMixin,
                                        AbortableStringTransport(), request)
         result.callback(response)
         finished.addCallback(self.assertEqual,
-                             u'[foo.test \u2192 bar.test] Unknown document')
+                             u'[foo.test → bar.test] Unknown document')
         return finished
 
     def test_redirect_to_same_host(self):
@@ -150,5 +151,17 @@ class HostnameTagTestCase(AgentTestsMixin,
                                        AbortableStringTransport(), request)
         result.callback(response)
         finished.addCallback(self.assertEqual,
-                             u'[foo.test \u2192 bar.test] Unknown document')
+                             u'[foo.test → bar.test] Unknown document')
+        return finished
+
+    def test_tag_iri_to_uri(self):
+        finished = self.fetcher.fetch_title(
+            u'http://ドメイン名例.test/', hostname_tag=True)
+        request, result = self.protocol.requests.pop()
+        response = Response._construct(('HTTP', 1, 1), 200, 'OK', Headers(),
+                                       AbortableStringTransport(), request)
+        result.callback(response)
+        finished.addCallback(self.assertEqual,
+                             u'[ドメイン名例.test → xn--eckwd4c7cu47r2wf.test] '
+                             u'Unknown document')
         return finished

@@ -53,7 +53,7 @@ class HTMLTitleExtractor(object):
                 # Not a valid number; just pretend it's zero.
                 seconds = 0
             if seconds <= self.max_refresh_delay and 'url' in params:
-                returnValue(Redirect(params['url'].encode('utf-8')))
+                returnValue(Redirect(params['url']))
         if soup.title:
             # Join twice: once because soup.title.strings is an iterator
             # and once after splitting to coalesce whitespace.

@@ -12,7 +12,8 @@ from twisted.internet.defer import Deferred, inlineCallbacks, returnValue
 from twisted.internet.protocol import Protocol, connectionDone
 from twisted.plugin import IPlugin, getPlugins
 from twisted.python.failure import Failure
-from twisted.web.client import (URI, IAgent, Agent, ContentDecoderAgent,
+from twisted.python.url import URL
+from twisted.web.client import (IAgent, Agent, ContentDecoderAgent,
                                 RedirectAgent, GzipDecoder, ResponseFailed)
 from twisted.web.error import InfiniteRedirection
 from twisted.web.iweb import UNKNOWN_LENGTH
@@ -105,8 +106,8 @@ class BlacklistingAgent(object):
 #
 
 #: Returned by title extractors to indicate a "soft" redirect, such as
-#: an HTML ``<meta>`` refresh.  The *location* parameter indicates the
-#: new URL to fetch.
+#: an HTML ``<meta>`` refresh.  The *location* parameter is a Unicode
+#: string indicating the new URL to fetch.
 Redirect = namedtuple('Redirect', ['location'])
 
 
@@ -148,19 +149,29 @@ class TitleFetcher(object):
         self.max_soft_redirects = 2
 
     @inlineCallbacks
-    def fetch_title(self, uri, hostname_tag=False):
-        """Fetch the document at *uri* and return a `Deferred` yielding
-        the document title or summary as a Unicode string.
+    def fetch_title(self, url, hostname_tag=False):
+        """Fetch the document at *url* and return a `Deferred` yielding
+        the document title or summary as a Unicode string.  *url* may be
+        a Unicode string IRI, a byte string URI, or a Twisted `URL`.
 
         If *hostname_tag* is true, prefix the extracted title with the
-        hostname of the initially requested URI, as well as the hostname
-        of the final URI if it differs due to redirects."""
+        hostname of the initially requested URI or IRI in the form that
+        was originally provided, as well as the hostname of the final
+        ASCII-only URI if it differs due to redirects or normalization.
+        """
         title = None
-        current = uri
+        if isinstance(url, unicode):
+            url = URL.fromText(url)
+        elif isinstance(url, str):
+            url = URL.fromText(url.decode('ascii'))
+        current = url
         response = None
         for _ in xrange(self.max_soft_redirects):
             last_response = response
-            response = yield self.agent.request('GET', current)
+            # This encoding should be safe, since asURI() only returns
+            # URIs with ASCII code points.
+            response = yield self.agent.request(
+                'GET', current.asURI().asText().encode('ascii'))
             response.setPreviousResponse(last_response)
             content_type = cgi.parse_header(
                 response.headers.getRawHeaders('Content-Type', [''])[0])[0]
@@ -168,7 +179,9 @@ class TitleFetcher(object):
                 extractor = self.extractors[content_type]
                 extracted = yield extractor.extract(response)
                 if isinstance(extracted, Redirect):
-                    current = urljoin(current, extracted.location)
+                    current = URL.fromText(
+                        response.request.absoluteURI.decode('ascii')).click(
+                        extracted.location)
                     continue
                 title = extracted
             # The only case where we'd want to loop again is when the
@@ -176,14 +189,16 @@ class TitleFetcher(object):
             break
         else:
             raise ResponseFailed([Failure(InfiniteRedirection(
-                599, 'Too many soft redirects', location=current))])
+                599, 'Too many soft redirects',
+                location=current.asURI().asText().encode('ascii')))])
         if title is None:
             title = u'{} document'.format(content_type or u'Unknown')
             if response.length is not UNKNOWN_LENGTH:
                 title += u' ({})'.format(filesize(response.length))
         if hostname_tag:
-            initial = URI.fromBytes(uri).host
-            final = URI.fromBytes(response.request.absoluteURI).host
+            initial = url.host
+            final = URL.fromText(
+                response.request.absoluteURI.decode('ascii')).host
             if initial == final:
                 tag = initial
             else:

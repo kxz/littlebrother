@@ -3,6 +3,7 @@
 
 import argparse
 from itertools import imap
+import locale
 import sys
 
 from twisted.internet.defer import DeferredList
@@ -15,7 +16,7 @@ def print_and_exit(results):
     """Print each result and stop the reactor."""
     for success, value in results:
         if success:
-            print value.encode('utf-8')
+            print value.encode(locale.getpreferredencoding())
         else:
             value.printTraceback()
 
@@ -35,7 +36,8 @@ def main(reactor):
     args = parser.parse_args()
     uris = args.uris or imap(lambda x: x.strip(), sys.stdin)
     finished = DeferredList([
-        fetch_title(uri, hostname_tag=args.hostname_tag)
+        fetch_title(uri.decode(locale.getpreferredencoding()),
+                    hostname_tag=args.hostname_tag)
         for uri in uris])
     finished.addCallback(print_and_exit)
     return finished
