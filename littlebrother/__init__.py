@@ -9,12 +9,14 @@ from urlparse import urljoin, urlparse
 import ipaddress
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred, inlineCallbacks, returnValue
+from twisted.internet.error import ConnectError, DNSLookupError
 from twisted.internet.protocol import Protocol, connectionDone
 from twisted.plugin import IPlugin, getPlugins
 from twisted.python.failure import Failure
 from twisted.python.url import URL
 from twisted.web.client import (IAgent, Agent, ContentDecoderAgent,
-                                RedirectAgent, GzipDecoder, ResponseFailed)
+                                RedirectAgent, GzipDecoder, Response,
+                                ResponseFailed)
 from twisted.web.error import InfiniteRedirection
 from twisted.web.iweb import UNKNOWN_LENGTH
 from zope.interface import implements, Attribute
@@ -135,6 +137,19 @@ for extractor in getPlugins(ITitleExtractor, plugins):
         default_extractors[content_type] = extractor
 
 
+def describe_error(failure):
+    """If *failure* is a common connection error, return a Unicode
+    string describing it.  Otherwise, return *failure*."""
+    if failure.check(ResponseFailed):
+        if any(f.check(InfiniteRedirection)
+               for f in failure.value.reasons):
+            return u'Encountered too many redirects.'
+        return u'Received incomplete response from server.'
+    if failure.check(ConnectError, DNSLookupError, BlacklistedHost):
+        return u'Could not connect to server.'
+    return failure
+
+
 class TitleFetcher(object):
     """Does exactly what it says on the tin."""
 
@@ -149,7 +164,7 @@ class TitleFetcher(object):
         self.max_soft_redirects = 2
 
     @inlineCallbacks
-    def fetch_title(self, url, hostname_tag=False):
+    def fetch_title(self, url, hostname_tag=False, friendly_errors=False):
         """Fetch the document at *url* and return a `Deferred` yielding
         the document title or summary as a Unicode string.  *url* may be
         a Unicode string IRI, a byte string URI, or a Twisted `URL`.
@@ -158,6 +173,10 @@ class TitleFetcher(object):
         hostname of the initially requested URI or IRI in the form that
         was originally provided, as well as the hostname of the final
         ASCII-only URI if it differs due to redirects or normalization.
+
+        If *friendly_errors* is true, catch common connection errors and
+        return a description of the error as the extracted title instead
+        of reraising.  Otherwise, all errors bubble to the caller.
         """
         title = None
         if isinstance(url, unicode):
@@ -170,8 +189,15 @@ class TitleFetcher(object):
             last_response = response
             # This encoding should be safe, since asURI() only returns
             # URIs with ASCII code points.
-            response = yield self.agent.request(
+            request = self.agent.request(
                 'GET', current.asURI().asText().encode('ascii'))
+            if friendly_errors:
+                request.addErrback(describe_error)
+            response = yield request
+            if isinstance(response, basestring):
+                # We got an error message from describe_error.  Bail.
+                title = response
+                break
             response.setPreviousResponse(last_response)
             content_type = cgi.parse_header(
                 response.headers.getRawHeaders('Content-Type', [''])[0])[0]
@@ -188,21 +214,24 @@ class TitleFetcher(object):
             # response returned is a soft redirect.
             break
         else:
-            raise ResponseFailed([Failure(InfiniteRedirection(
-                599, 'Too many soft redirects',
-                location=current.asURI().asText().encode('ascii')))])
+            if friendly_errors:
+                title = u'Encountered too many redirects.'
+            else:
+                raise ResponseFailed([Failure(InfiniteRedirection(
+                    599, 'Too many soft redirects',
+                    location=current.asURI().asText().encode('ascii')))])
         if title is None:
             title = u'{} document'.format(content_type or u'Unknown')
             if response.length is not UNKNOWN_LENGTH:
                 title += u' ({})'.format(filesize(response.length))
         if hostname_tag:
-            initial = url.host
-            final = URL.fromText(
-                response.request.absoluteURI.decode('ascii')).host
-            if initial == final:
-                tag = initial
-            else:
-                tag = u'{} \u2192 {}'.format(initial, final)
+            tag = url.host
+            if isinstance(response, Response):
+                initial = url.host
+                final = URL.fromText(
+                    response.request.absoluteURI.decode('ascii')).host
+                if initial != final:
+                    tag = u'{} \u2192 {}'.format(initial, final)
             title = u'[{}] {}'.format(tag, title)
         returnValue(title)
 

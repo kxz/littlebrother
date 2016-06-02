@@ -37,7 +37,7 @@ def main(reactor):
     uris = args.uris or imap(lambda x: x.strip(), sys.stdin)
     finished = DeferredList([
         fetch_title(uri.decode(locale.getpreferredencoding()),
-                    hostname_tag=args.hostname_tag)
+                    hostname_tag=args.hostname_tag, friendly_errors=True)
         for uri in uris])
     finished.addCallback(print_and_exit)
     return finished
